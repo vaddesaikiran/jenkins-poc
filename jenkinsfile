@@ -4,20 +4,19 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                // Jenkins will pull repo - replace URL later
-                git url: 'YOUR_GITHUB_REPO_URL'
+                git url: 'https://github.com/vaddesaikiran/jenkins-poc.git', branch: 'main'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
+                bat 'pip install -r requirements.txt'
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh 'pytest -v'
+                bat 'pytest -v'
             }
         }
     }
