@@ -22,12 +22,13 @@ pipeline {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
                         powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
-                        powershell -Command ".\\gitleaks.exe detect --source . --no-git --report-format json --report-path gitleaks-report.json"
+                        powershell -Command ".\\gitleaks.exe detect --source . --no-git -c .gitleaks.toml --report-format json --report-path gitleaks-report.json"
                     """
+                    // Robust: Check if report exists before reading
                     if (fileExists('gitleaks-report.json')) {
                         def leaksReport = readJSON file: 'gitleaks-report.json'
                         if (leaksReport.findings?.size() > 0) {
-                            echo "GitLeaks found ${leaksReport.findings.size()} potential leaks (likely false positives)—review report. Continuing for POC..."
+                            error "GitLeaks detected ${leaksReport.findings.size()} secrets! (Check gitleaks-report.json for details)"
                         } else {
                             echo "No secrets detected. 🔒"
                         }
@@ -39,6 +40,7 @@ pipeline {
             }
             post {
                 always {
+                    // Broader cleanup
                     bat """
                         if exist gitleaks.zip del gitleaks.zip
                         if exist gitleaks.exe del gitleaks.exe
@@ -58,7 +60,7 @@ pipeline {
         stage('Run Tests with Coverage') {
             steps {
                 bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v"
-                junit '**/test-results/*.xml'
+                junit '**/test-results/*.xml'  // Optional: For JUnit test trends in Jenkins
             }
             post {
                 always {
