@@ -4,16 +4,13 @@ title = "POC GitLeaks Config - Relaxed for False Positives"
 description = "Generic API Key"
 regex = '''(?i)(?:(?:api[-_]?)?key[-_]?|token|secret|password|pwd).{0,100}['\"][A-Za-z0-9+/]{20,}['\"]'''
 ruleID = "generic-api-key"
-entropyThreshold = 4.5  # Raise to reduce false positives on low-entropy strings
+entropyThreshold = 4.5  # Raise to reduce false positives
 
 [[rules]]
 description = "Hex Secrets"
 regex = '''[0-9a-fA-F]{32,}'''
 ruleID = "hex-secrets"
-allowlist = ["main.py", "test_main.py"]  # Skip hex in your code files (e.g., numbers)
+allowlist = { paths = ["main.py", "test_main.py"] }  # Map structure for file exclusions
 
-[[allowlists]]
-paths = ["Jenkinsfile"]  # Skip pipeline file entirely
-
-[[baselines]]
-path = "baseline.json"  # Optional: Ignore known old leaks (generate from first scan)
+[allowlist]
+paths = ["Jenkinsfile"]  # Global exclusion for pipeline file
