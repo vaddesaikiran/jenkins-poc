@@ -5,7 +5,7 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = 'sqp_d5afd576075f69241cd732a6e6892c65b6fa7e13'  // HARDCODED TEMPORARILY - REMOVE & USE credentials('sonarqube-token') AFTER TESTING!
+        SONARQUBE_TOKEN = credentials('sonarqube-token')  // Secure: Pulls from Jenkins Credentials
         GITLEAKS_VERSION = '8.28.0'  // Latest stable
     }
 
