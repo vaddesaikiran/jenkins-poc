@@ -6,7 +6,7 @@ pipeline {
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
         SONARQUBE_TOKEN = 'sqp_d5afd576075f69241cd732a6e6892c65b6fa7e13'  // HARDCODED TEMPORARILY - REMOVE & USE credentials('sonarqube-token') AFTER TESTING!
-        GITLEAKS_VERSION = '8.28.0'  // Updated to latest
+        GITLEAKS_VERSION = '8.28.0'  // Latest stable
     }
 
     stages {
@@ -22,7 +22,7 @@ pipeline {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
                         powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
-                        powershell -Command ".\\gitleaks.exe detect --source . --exclude-path Jenkinsfile --report-format json --report-path gitleaks-report.json"
+                        powershell -Command ".\\gitleaks.exe detect --source . --report-format json --report-path gitleaks-report.json"
                     """
                     // Robust: Check if report exists before reading
                     if (fileExists('gitleaks-report.json')) {
