@@ -15,9 +15,6 @@ pipeline {
             }
         }
 
-        // Temp skip GitLeaks for POC - re-add later with custom config
-        // stage('Secret Scan with GitLeaks') { ... }
-
         stage('Install Dependencies') {
             steps {
                 bat "${PIP_PATH} install -r requirements.txt"
@@ -26,12 +23,13 @@ pipeline {
 
         stage('Run Tests with Coverage') {
             steps {
-                bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v"
-                junit '**/test-results/*.xml'
+                bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v"
+                junit '**/test-results.xml'  // Matches the generated JUnit XML
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'test-results.xml', allowEmptyArchive: true
                 }
             }
         }
@@ -47,7 +45,7 @@ pipeline {
                             -Dsonar.sources=. ^
                             -Dsonar.tests=. ^
                             -Dsonar.python.coverage.reportPaths=coverage.xml ^
-                            -Dsonar.test.reportPath=**/test-results/*.xml ^
+                            -Dsonar.test.reportPath=test-results.xml ^
                             -Dsonar.host.url=${SONARQUBE_URL} ^
                             -Dsonar.login=${SONARQUBE_TOKEN}
                         """
