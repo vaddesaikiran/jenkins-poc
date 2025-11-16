@@ -22,7 +22,7 @@ pipeline {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
                         powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
-                        powershell -Command ".\\gitleaks.exe detect --source . --no-git --report-format json --report-path gitleaks-report.json"
+                        powershell -Command ".\\gitleaks.exe detect --source . --no-git -c .gitleaks.toml --report-format json --report-path gitleaks-report.json"
                     """
                     // Robust: Check if report exists before reading
                     if (fileExists('gitleaks-report.json')) {
