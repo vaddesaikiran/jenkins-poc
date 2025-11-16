@@ -5,8 +5,8 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = 'sqp_d5afd576075f69241cd732a6e6892c65b6fa7e13'  // HARDCODED TEMPORARILY - REMOVE AFTER TESTING!
-        GITLEAKS_VERSION = '8.18.4'
+        SONARQUBE_TOKEN = 'sqp_d5afd576075f69241cd732a6e6892c65b6fa7e13'  // HARDCODED TEMPORARILY - REMOVE & USE credentials('sonarqube-token') AFTER TESTING!
+        GITLEAKS_VERSION = '8.28.0'  // Updated to latest
     }
 
     stages {
@@ -21,24 +21,31 @@ pipeline {
                 script {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
-                        powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.'"
-                        powershell -Command ".\\gitleaks.exe detect --source . --report-format json --report-path gitleaks-report.json"
+                        powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
+                        powershell -Command ".\\gitleaks.exe detect --source . --exclude-path Jenkinsfile --report-format json --report-path gitleaks-report.json"
                     """
-                    def leaksReport = readJSON file: 'gitleaks-report.json'
-                    if (leaksReport.findings?.size() > 0) {
-                        error "GitLeaks detected ${leaksReport.findings.size()} secrets!"
+                    // Robust: Check if report exists before reading
+                    if (fileExists('gitleaks-report.json')) {
+                        def leaksReport = readJSON file: 'gitleaks-report.json'
+                        if (leaksReport.findings?.size() > 0) {
+                            error "GitLeaks detected ${leaksReport.findings.size()} secrets! (Check gitleaks-report.json for details)"
+                        } else {
+                            echo "No secrets detected. 🔒"
+                        }
                     } else {
-                        echo "No secrets detected. 🔒"
+                        error "GitLeaks report not generated—check extract/run logs."
                     }
                     archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
                 }
             }
             post {
                 always {
-                    // Cleanup: ZIP + extracted exe
+                    // Broader cleanup
                     bat """
                         if exist gitleaks.zip del gitleaks.zip
                         if exist gitleaks.exe del gitleaks.exe
+                        if exist LICENSE del LICENSE
+                        if exist README.md del README.md
                     """
                 }
             }
