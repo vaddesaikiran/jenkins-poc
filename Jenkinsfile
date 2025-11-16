@@ -1,23 +1,98 @@
 pipeline {
     agent any
 
+    environment {
+        PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
+        PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
+        SONARQUBE_URL = 'http://localhost:9000'
+        SONARQUBE_TOKEN = credentials('sonarqube-token')
+        GITLEAKS_VERSION = '8.18.4'
+    }
+
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/vaddesaikiran/jenkins-poc.git', branch: 'main'
+                checkout scm
+            }
+        }
+
+        stage('Secret Scan with GitLeaks') {
+            steps {
+                script {
+                    bat """
+                        powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
+                        powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.'"
+                        powershell -Command ".\\gitleaks_${GITLEAKS_VERSION}_windows_x64\\gitleaks.exe detect --source . --report-format json --report-path gitleaks-report.json"
+                    """
+                    def leaksReport = readJSON file: 'gitleaks-report.json'
+                    if (leaksReport.findings?.size() > 0) {
+                        error "GitLeaks detected ${leaksReport.findings.size()} secrets!"
+                    } else {
+                        echo "No secrets detected. 🔒"
+                    }
+                    archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+                }
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe" install -r requirements.txt'
+                bat "${PIP_PATH} install -r requirements.txt"
             }
         }
 
-        stage('Run Tests') {
+        stage('Run Tests with Coverage') {
             steps {
-                bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe" -m pytest -v'
+                bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v"
+                // Archives JUnit XML for Jenkins test trends (if pytest generates it via plugin)
+                junit '**/test-results/*.xml'  // Add pytest-html or similar if needed for XML
             }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    def scannerHome = tool 'SonarScanner'
+                    withSonarQubeEnv(installationName: 'Local SonarQube') {
+                        bat """
+                            ${scannerHome}/bin/sonar-scanner.bat ^
+                            -Dsonar.projectKey=jenkins-poc ^
+                            -Dsonar.sources=. ^
+                            -Dsonar.tests=. ^
+                            -Dsonar.python.coverage.reportPaths=coverage.xml ^
+                            -Dsonar.test.reportPath=**/test-results/*.xml ^
+                            -Dsonar.host.url=${SONARQUBE_URL} ^
+                            -Dsonar.login=${SONARQUBE_TOKEN}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            bat 'if exist gitleaks.zip del gitleaks.zip'
+            bat 'if exist gitleaks_* rmdir /s /q gitleaks_*'
+        }
+        success {
+            echo 'Pipeline green! Tests passed, coverage analyzed, quality gate cleared. Merge away! 🎉'
+        }
+        failure {
+            echo 'Build failed—check tests, leaks, or SonarQube issues.'
         }
     }
 }
