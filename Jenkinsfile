@@ -33,6 +33,15 @@ pipeline {
                     archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
                 }
             }
+            post {
+                always {
+                    // Cleanup: Runs in workspace after GitLeaks
+                    bat """
+                        if exist gitleaks.zip del gitleaks.zip
+                        if exist gitleaks_* rmdir /s /q gitleaks_*
+                    """
+                }
+            }
         }
 
         stage('Install Dependencies') {
@@ -44,8 +53,7 @@ pipeline {
         stage('Run Tests with Coverage') {
             steps {
                 bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v"
-                // Archives JUnit XML for Jenkins test trends (if pytest generates it via plugin)
-                junit '**/test-results/*.xml'  // Add pytest-html or similar if needed for XML
+                junit '**/test-results/*.xml'  // Optional: For JUnit test trends in Jenkins
             }
             post {
                 always {
@@ -61,7 +69,7 @@ pipeline {
                     withSonarQubeEnv(installationName: 'Local SonarQube') {
                         bat """
                             ${scannerHome}/bin/sonar-scanner.bat ^
-                            -Dsonar.projectKey=jenkins-poc ^
+                            -Dsonar.projectKey=Jenkins-POC ^
                             -Dsonar.sources=. ^
                             -Dsonar.tests=. ^
                             -Dsonar.python.coverage.reportPaths=coverage.xml ^
@@ -84,10 +92,6 @@ pipeline {
     }
 
     post {
-        always {
-            bat 'if exist gitleaks.zip del gitleaks.zip'
-            bat 'if exist gitleaks_* rmdir /s /q gitleaks_*'
-        }
         success {
             echo 'Pipeline green! Tests passed, coverage analyzed, quality gate cleared. Merge away! 🎉'
         }
