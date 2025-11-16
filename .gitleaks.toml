@@ -1,4 +1,4 @@
-title = "POC GitLeaks Config - Relaxed for False Positives"
+title = "POC GitLeaks Config - Relaxed"
 
 [[rules]]
 description = "Generic API Key"
@@ -10,7 +10,6 @@ entropyThreshold = 4.5
 description = "Hex Secrets"
 regex = '''[0-9a-fA-F]{32,}'''
 ruleID = "hex-secrets"
-allowlist = { paths = ["main.py", "test_main.py"] }
 
 [allowlist]
 paths = ["Jenkinsfile"]

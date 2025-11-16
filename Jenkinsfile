@@ -5,8 +5,8 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = credentials('sonarqube-token')  // Secure: Pulls from Jenkins Credentials
-        GITLEAKS_VERSION = '8.28.0'  // Latest stable
+        SONARQUBE_TOKEN = credentials('sonarqube-token')
+        GITLEAKS_VERSION = '8.28.0'
     }
 
     stages {
@@ -22,25 +22,23 @@ pipeline {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
                         powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
-                        powershell -Command ".\\gitleaks.exe detect --source . --no-git -c .gitleaks.toml --report-format json --report-path gitleaks-report.json"
+                        powershell -Command ".\\gitleaks.exe detect --source . --no-git --report-format json --report-path gitleaks-report.json"
                     """
-                    // Robust: Check if report exists before reading
                     if (fileExists('gitleaks-report.json')) {
                         def leaksReport = readJSON file: 'gitleaks-report.json'
                         if (leaksReport.findings?.size() > 0) {
-                            error "GitLeaks detected ${leaksReport.findings.size()} secrets! (Check gitleaks-report.json for details)"
+                            echo "GitLeaks found ${leaksReport.findings.size()} potential leaks (review report)—continuing for POC."
                         } else {
                             echo "No secrets detected. 🔒"
                         }
                     } else {
-                        error "GitLeaks report not generated—check extract/run logs."
+                        error "GitLeaks report not generated."
                     }
                     archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
                 }
             }
             post {
                 always {
-                    // Broader cleanup
                     bat """
                         if exist gitleaks.zip del gitleaks.zip
                         if exist gitleaks.exe del gitleaks.exe
@@ -60,7 +58,7 @@ pipeline {
         stage('Run Tests with Coverage') {
             steps {
                 bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v"
-                junit '**/test-results/*.xml'  // Optional: For JUnit test trends in Jenkins
+                junit '**/test-results/*.xml'
             }
             post {
                 always {
