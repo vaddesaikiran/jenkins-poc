@@ -22,7 +22,7 @@ pipeline {
                     bat """
                         powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
                         powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.'"
-                        powershell -Command ".\\gitleaks_${GITLEAKS_VERSION}_windows_x64\\gitleaks.exe detect --source . --report-format json --report-path gitleaks-report.json"
+                        powershell -Command ".\\gitleaks.exe detect --source . --report-format json --report-path gitleaks-report.json"
                     """
                     def leaksReport = readJSON file: 'gitleaks-report.json'
                     if (leaksReport.findings?.size() > 0) {
@@ -35,10 +35,10 @@ pipeline {
             }
             post {
                 always {
-                    // Cleanup: Runs in workspace after GitLeaks
+                    // Cleanup: ZIP + extracted exe
                     bat """
                         if exist gitleaks.zip del gitleaks.zip
-                        if exist gitleaks_* rmdir /s /q gitleaks_*
+                        if exist gitleaks.exe del gitleaks.exe
                     """
                 }
             }
