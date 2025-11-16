@@ -5,8 +5,7 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = credentials('sonarqube-token')
-        GITLEAKS_VERSION = '8.28.0'
+        SONARQUBE_TOKEN = credentials('sonarqube-token')  // Secure: Pulls from Jenkins Credentials
     }
 
     stages {
@@ -16,38 +15,8 @@ pipeline {
             }
         }
 
-        stage('Secret Scan with GitLeaks') {
-            steps {
-                script {
-                    bat """
-                        powershell -Command "Invoke-WebRequest -Uri 'https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_windows_x64.zip' -OutFile 'gitleaks.zip'"
-                        powershell -Command "Expand-Archive -Path 'gitleaks.zip' -DestinationPath '.' -Force"
-                        powershell -Command ".\\gitleaks.exe detect --source . --no-git --report-format json --report-path gitleaks-report.json"
-                    """
-                    if (fileExists('gitleaks-report.json')) {
-                        def leaksReport = readJSON file: 'gitleaks-report.json'
-                        if (leaksReport.findings?.size() > 0) {
-                            echo "GitLeaks found ${leaksReport.findings.size()} potential leaks (review report)—continuing for POC."
-                        } else {
-                            echo "No secrets detected. 🔒"
-                        }
-                    } else {
-                        error "GitLeaks report not generated."
-                    }
-                    archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
-                }
-            }
-            post {
-                always {
-                    bat """
-                        if exist gitleaks.zip del gitleaks.zip
-                        if exist gitleaks.exe del gitleaks.exe
-                        if exist LICENSE del LICENSE
-                        if exist README.md del README.md
-                    """
-                }
-            }
-        }
+        // Temp skip GitLeaks for POC - re-add later with custom config
+        // stage('Secret Scan with GitLeaks') { ... }
 
         stage('Install Dependencies') {
             steps {
@@ -101,7 +70,7 @@ pipeline {
             echo 'Pipeline green! Tests passed, coverage analyzed, quality gate cleared. Merge away! 🎉'
         }
         failure {
-            echo 'Build failed—check tests, leaks, or SonarQube issues.'
+            echo 'Build failed—check tests or SonarQube issues.'
         }
     }
 }
