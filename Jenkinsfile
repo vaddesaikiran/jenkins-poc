@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/vaddesaikiran/nonexistent-repo.git', branch: 'main'
+                git url: 'https://github.com/vaddesaikiran/jenkins-poc.git', branch: 'main'
             }
         }
 
@@ -23,7 +23,6 @@ pipeline {
             steps {
                 script {
                     echo 'Deleting old GitLeaks report files if any...'
-                    bat 'if exist gitleaks-report.json del gitleaks-report.json'
                 }
             }
         }
