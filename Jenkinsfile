@@ -14,19 +14,23 @@ pipeline {
                     echo 'Running GitLeaks scan for secrets...'
                     bat '''
                         docker pull zricethezav/gitleaks:latest
-                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect --source=/repo --report-path=/repo/gitleaks-report.json --exit-code 1
+                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect --source=/repo --report-format=json --report-path=/repo/gitleaks-report.json --exit-code 1 --verbose
                     '''
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
-                }
-                failure {
-                    echo 'GitLeaks found potential secrets. Please review gitleaks-report.json.'
+                    
+                    def gitleaksJson = readJSON file: 'gitleaks-report.json'
+                    publishHTML([reportDir: '.', reportFiles: 'gitleaks-report.json', reportName: "GitLeaks Report"])
+
+                    if (gitleaksJson.size() > 0) {
+                        error "❌ GitLeaks detected secrets. Failing the build."
+                    } else {
+                        echo "✅ GitLeaks scan passed. No secrets found."
+                    }
+                    
+                    bat 'del gitleaks-report.json'
                 }
             }
         }
+
 
 
 
