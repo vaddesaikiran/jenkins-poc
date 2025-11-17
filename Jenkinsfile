@@ -40,14 +40,36 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe" install -r requirements.txt'
+                bat "${PIP_PATH} install -r requirements.txt"
             }
         }
 
-        stage('Run Tests') {
+
+
+        // stage('Install Dependencies') {
+        //     steps {
+        //         bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe" install -r requirements.txt'
+        //     }
+        // }
+
+        // stage('Run Tests') {
+        //     steps {
+        //         bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe" -m pytest -v'
+        //     }
+        // }
+
+        stage('Run Tests with Coverage') {
             steps {
-                bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe" -m pytest -v'
+                bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v"
+                junit '**/test-results.xml'
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'test-results.xml', allowEmptyArchive: true
+                }
             }
         }
+
     }
 }
