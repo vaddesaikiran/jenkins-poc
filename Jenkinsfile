@@ -14,11 +14,17 @@ pipeline {
                     echo 'Running GitLeaks scan for secrets...'
                     bat '''
                         docker pull zricethezav/gitleaks:latest
-                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect --source=/repo --report-format=json --report-path=/repo/gitleaks-report.json --exit-code 1 --verbose
+                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
+                            --source=/repo \
+                            --no-git \
+                            --report-format=json \
+                            --report-path=/repo/gitleaks-report.json \
+                            --exit-code 1 \
+                            --verbose
                     '''
                     
                     def gitleaksJson = readJSON file: 'gitleaks-report.json'
-                    publishHTML([reportDir: '.', reportFiles: 'gitleaks-report.json', reportName: "GitLeaks Report"])
+                    publishHTML([reportDir: '.', reportFiles: 'gitleaks-report.json', reportName: 'GitLeaks Report'])
 
                     if (gitleaksJson.size() > 0) {
                         error "❌ GitLeaks detected secrets. Failing the build."
@@ -30,9 +36,6 @@ pipeline {
                 }
             }
         }
-
-
-
 
         stage('Install Dependencies') {
             steps {
