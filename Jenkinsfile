@@ -28,6 +28,12 @@ pipeline {
             }
         }
 
+        stage('Install Dependencies') {
+            steps {
+                bat "${PIP_PATH} install -r requirements.txt"
+            }
+        }
+
         stage('Secret Scan with GitLeaks') {
             steps {
                 script {
@@ -54,7 +60,7 @@ pipeline {
                 script {
                     echo 'Running Snyk scan for vulnerabilities...'
                     bat '''
-                        docker pull snyk/snyk:latest
+                        docker pull snyk/snyk-cli:latest
                         docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:latest test --file=/app/requirements.txt
                     '''
                     if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
@@ -65,14 +71,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Install Dependencies') {
-            steps {
-                bat "${PIP_PATH} install -r requirements.txt"
-            }
-        }
-
-
 
         // stage('Install Dependencies') {
         //     steps {
