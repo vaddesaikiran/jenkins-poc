@@ -17,22 +17,15 @@ pipeline {
                         docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
                             --source=/repo \
                             --no-git \
-                            --report-format=json \
-                            --report-path=/repo/gitleaks-report.json \
                             --exit-code 1 \
                             --verbose
                     '''
-                    
-                    def gitleaksJson = readJSON file: 'gitleaks-report.json'
-                    publishHTML([reportDir: '.', reportFiles: 'gitleaks-report.json', reportName: 'GitLeaks Report'])
-
-                    if (gitleaksJson.size() > 0) {
+                    // Since no report is written, just rely on docker exit code to fail the build
+                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
                         error "❌ GitLeaks detected secrets. Failing the build."
                     } else {
                         echo "✅ GitLeaks scan passed. No secrets found."
                     }
-                    
-                    bat 'del gitleaks-report.json'
                 }
             }
         }
