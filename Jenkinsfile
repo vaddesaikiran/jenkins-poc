@@ -96,7 +96,8 @@ pipeline {
                         ${scannerHome}\\bin\\sonar-scanner.bat ^
                         -Dsonar.projectKey=my_project ^
                         -Dsonar.sources=. ^
-                        -Dsonar.tests=**/*test*.py ^
+                        -Dsonar.tests=. ^
+                        -Dsonar.test.inclusions=test_main.py ^
                         -Dsonar.python.coverage.reportPaths=coverage.xml ^
                         -Dsonar.python.xunit.reportPaths=test-results.xml ^
                         -Dsonar.host.url=${SONARQUBE_URL} ^
