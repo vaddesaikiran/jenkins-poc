@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/vaddesaikiran/jenkins-poc.git', branch: 'main'
+                git url: 'https://github.com/vaddesaikiran/nonexistent-repo.git', branch: 'main'
             }
         }
 
