@@ -7,7 +7,7 @@ pipeline {
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         scannerHome = tool 'SonarScanner'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = credentials('sonarqube-token')
+        SONARQUBE_TOKEN = "sonar_29f5b1b5b97f66c886d8db9dce9ee2c0f0ba84b2"
         SNYK_TOKEN = credentials('snyk-token')
 
     }
@@ -23,6 +23,7 @@ pipeline {
             steps {
                 script {
                     echo 'Deleting old GitLeaks report files if any...'
+                    bat 'if exist gitleaks-report.json del gitleaks-report.json'
                 }
             }
         }
