@@ -5,13 +5,34 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         SONARQUBE_URL = 'http://localhost:9000'
-        SONARQUBE_TOKEN = credentials('sonarqube-token')  // Secure: Pulls from Jenkins Credentials
+        SONARQUBE_TOKEN = credentials('sonarqube-token')
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Secret Scan with GitLeaks') {
+            steps {
+                script {
+                    echo 'Running GitLeaks scan for secrets...'
+                    // Pull the latest GitLeaks Docker image and run the scan
+                    bat '''
+                        docker pull zricethezav/gitleaks:latest
+                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect --source="/repo" --report-path="/repo/gitleaks-report.json" --exit-code 1
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+                }
+                failure {
+                    echo 'GitLeaks found potential secrets. Please review gitleaks-report.json.'
+                }
             }
         }
 
@@ -24,7 +45,7 @@ pipeline {
         stage('Run Tests with Coverage') {
             steps {
                 bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v"
-                junit '**/test-results.xml'  // Matches the generated JUnit XML
+                junit '**/test-results.xml'
             }
             post {
                 always {
@@ -68,7 +89,7 @@ pipeline {
             echo 'Pipeline green! Tests passed, coverage analyzed, quality gate cleared. Merge away! 🎉'
         }
         failure {
-            echo 'Build failed—check tests or SonarQube issues.'
+            echo 'Build failed—check tests, GitLeaks scan, or SonarQube issues.'
         }
     }
 }
