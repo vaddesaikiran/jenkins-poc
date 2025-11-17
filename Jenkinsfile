@@ -5,6 +5,7 @@ pipeline {
     environment {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
+        scannerHome = tool 'SonarScanner'
     }
 
     stages {
@@ -76,6 +77,15 @@ pipeline {
                 }
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') { // must match the configured server name in Manage Jenkins > Configure System
+                    bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=my_project -Dsonar.sources=."
+                }
+            }
+        }
+
 
     }
 }
