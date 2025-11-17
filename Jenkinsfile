@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+
+    environment {
+        PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
+        PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
+    }
+
     stages {
         stage('Checkout Code') {
             steps {
