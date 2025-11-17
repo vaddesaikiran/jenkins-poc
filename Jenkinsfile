@@ -59,11 +59,15 @@ pipeline {
             steps {
                 script {
                     echo 'Running Snyk scan for vulnerabilities...'
-                    bat '''
-                        docker pull snyk/snyk:gradle-8-jdk21-preview
-                        docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:gradle-8-jdk21-preview test --file=/app/requirements.txt
-                    '''
-                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
+                    def snykResult = bat(
+                        returnStatus: true,
+                        script: '''
+                            docker pull snyk/snyk:gradle-8-jdk21-preview
+                            docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:gradle-8-jdk21-preview test --file=/app/requirements.txt --severity-threshold=low
+                        '''
+                    )
+                    
+                    if (snykResult != 0) {
                         error "❌ Snyk detected vulnerabilities. Failing the build."
                     } else {
                         echo "✅ Snyk scan passed. No vulnerabilities found."
