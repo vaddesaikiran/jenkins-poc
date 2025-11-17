@@ -100,7 +100,7 @@ pipeline {
                         -Dsonar.python.coverage.reportPaths=coverage.xml ^
                         -Dsonar.test.reportPath=test-results.xml ^
                         -Dsonar.host.url=${SONARQUBE_URL} ^
-                        -Dsonar.login=${SONARQUBE_TOKEN}
+                        -Dsonar.token=${SONARQUBE_TOKEN}
                     """
                 }
             }
