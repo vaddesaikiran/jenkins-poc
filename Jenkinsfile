@@ -72,18 +72,6 @@ pipeline {
             }
         }
 
-        // stage('Install Dependencies') {
-        //     steps {
-        //         bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe" install -r requirements.txt'
-        //     }
-        // }
-
-        // stage('Run Tests') {
-        //     steps {
-        //         bat '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe" -m pytest -v'
-        //     }
-        // }
-
         stage('Run Tests with Coverage') {
             steps {
                 bat "${PYTHON_PATH} -m pytest --cov=. --cov-report=xml --cov-report=term-missing --junitxml=test-results.xml -v"
@@ -96,14 +84,6 @@ pipeline {
                 }
             }
         }
-
-        // stage('SonarQube Analysis') {
-        //     steps {
-        //         withSonarQubeEnv('SonarQube') { // must match the configured server name in Manage Jenkins > Configure System
-        //             bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=my_project -Dsonar.sources=."
-        //         }
-        //     }
-        // }
 
         stage('SonarQube Analysis') {
             steps {
@@ -122,14 +102,6 @@ pipeline {
                 }
             }
         }
-
-        // stage('Quality Gate') {
-        //     steps {
-        //         timeout(time: 5, unit: 'MINUTES') {
-        //             waitForQualityGate abortPipeline: false
-        //         }
-        //     }
-        // }
 
         stage('Quality Gate') {
             steps {
