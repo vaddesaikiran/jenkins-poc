@@ -6,6 +6,9 @@ pipeline {
         PYTHON_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"'
         PIP_PATH = '"C:\\Users\\saiki\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\pip.exe"'
         scannerHome = tool 'SonarScanner'
+        SONARQUBE_URL = 'http://localhost:9000'
+        SONARQUBE_TOKEN = credentials('sonarqube-token')
+
     }
 
     stages {
@@ -78,14 +81,37 @@ pipeline {
             }
         }
 
+        // stage('SonarQube Analysis') {
+        //     steps {
+        //         withSonarQubeEnv('SonarQube') { // must match the configured server name in Manage Jenkins > Configure System
+        //             bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=my_project -Dsonar.sources=."
+        //         }
+        //     }
+        // }
+
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') { // must match the configured server name in Manage Jenkins > Configure System
-                    bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=my_project -Dsonar.sources=."
+                withSonarQubeEnv(installationName: 'SonarScanner') {
+                    bat """
+                        ${scannerHome}\\bin\\sonar-scanner.bat ^
+                        -Dsonar.projectKey=my_project ^
+                        -Dsonar.sources=. ^
+                        -Dsonar.tests=. ^
+                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
+                        -Dsonar.test.reportPath=test-results.xml ^
+                        -Dsonar.host.url=${SONARQUBE_URL} ^
+                        -Dsonar.login=${SONARQUBE_TOKEN}
+                    """
                 }
             }
         }
 
-
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
     }
 }
