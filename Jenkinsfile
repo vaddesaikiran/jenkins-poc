@@ -8,6 +8,15 @@ pipeline {
             }
         }
 
+        stage('Clean Old Reports') {
+            steps {
+                script {
+                    echo 'Deleting old GitLeaks report files if any...'
+                    bat 'if exist gitleaks-report.json del gitleaks-report.json'
+                }
+            }
+        }
+
         stage('Secret Scan with GitLeaks') {
             steps {
                 script {
@@ -20,7 +29,6 @@ pipeline {
                             --exit-code 1 \
                             --verbose
                     '''
-                    // Since no report is written, just rely on docker exit code to fail the build
                     if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
                         error "❌ GitLeaks detected secrets. Failing the build."
                     } else {
