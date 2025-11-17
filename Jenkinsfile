@@ -60,8 +60,8 @@ pipeline {
                 script {
                     echo 'Running Snyk scan for vulnerabilities...'
                     bat '''
-                        docker pull snyk/snyk-cli:latest
-                        docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk-cli:latest test --file=/app/requirements.txt
+                        docker pull snyk/snyk
+                        docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk test --file=/app/requirements.txt
                     '''
                     if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
                         error "❌ Snyk detected vulnerabilities. Failing the build."
