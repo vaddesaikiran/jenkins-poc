@@ -12,10 +12,9 @@ pipeline {
             steps {
                 script {
                     echo 'Running GitLeaks scan for secrets...'
-                    // Pull the latest GitLeaks Docker image and run the scan
                     bat '''
                         docker pull zricethezav/gitleaks:latest
-                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect --source="/repo" --report-path="/repo/gitleaks-report.json" --exit-code 1
+                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest sh -c "gitleaks detect --source=/repo --report-path=/tmp/gitleaks-report.json --exit-code 1 && cp /tmp/gitleaks-report.json /repo/gitleaks-report.json"
                     '''
                 }
             }
@@ -28,6 +27,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Install Dependencies') {
             steps {
