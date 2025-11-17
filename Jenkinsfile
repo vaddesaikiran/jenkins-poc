@@ -8,6 +8,7 @@ pipeline {
         scannerHome = tool 'SonarScanner'
         SONARQUBE_URL = 'http://localhost:9000'
         SONARQUBE_TOKEN = credentials('sonarqube-token')
+        SNYK_TOKEN = credentials('snyk-token')
 
     }
 
@@ -43,6 +44,23 @@ pipeline {
                         error "❌ GitLeaks detected secrets. Failing the build."
                     } else {
                         echo "✅ GitLeaks scan passed. No secrets found."
+                    }
+                }
+            }
+        }
+
+        stage('Snyk Scan') {
+            steps {
+                script {
+                    echo 'Running Snyk scan for vulnerabilities...'
+                    bat '''
+                        docker pull snyk/snyk:latest
+                        docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:latest test --file=/app/requirements.txt
+                    '''
+                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
+                        error "❌ Snyk detected vulnerabilities. Failing the build."
+                    } else {
+                        echo "✅ Snyk scan passed. No vulnerabilities found."
                     }
                 }
             }
