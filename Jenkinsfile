@@ -94,6 +94,44 @@ pipeline {
             }
         }
 
+        i will add only this part is this fine
+
+
+        // NEW: Qualys Container Security Scan
+        stage('Qualys Container Security Scan') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'qualys-api-cred', usernameVariable: 'QUALYS_USERNAME', passwordVariable: 'QUALYS_PASSWORD')]) {
+                    script {
+                        echo 'Running Qualys Container Security Scan...'
+                        bat """
+                            docker pull qualys/secpod:cs-scanner
+                            docker run --rm ^
+                                -e QUALYS_USERNAME=%QUALYS_USERNAME% ^
+                                -e QUALYS_PASSWORD=%QUALYS_PASSWORD% ^
+                                -v "%cd%:/workspace" ^
+                                qualys/secpod:cs-scanner ^
+                                --image-name jenkins-poc-app ^
+                                --source-type local ^
+                                --local-path /workspace ^
+                                --report-name qualys-scan-report.html ^
+                                --report-format html
+                        """
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        if (fileExists('qualys-scan-report.html')) {
+                            echo "✅ Qualys Container Security scan completed - report generated"
+                            archiveArtifacts artifacts: 'qualys-scan-report.html', allowEmptyArchive: true
+                        } else {
+                            echo "⚠️ Qualys scan completed but no HTML report found"
+                        }
+                    }
+                }
+            }
+        }
 
         stage('Run Tests with Coverage') {
             steps {
