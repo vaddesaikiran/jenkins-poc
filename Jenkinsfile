@@ -72,21 +72,27 @@ pipeline {
             }
         }
 
-        stage('Qualys VM Scan') {
+
+        stage('Qualys Host Scanning') {
             steps {
-                qualysVulnerabilityAnalyzer(
-                    apiServer: 'https://qualysguard.qg1.apps.qualys.in/',  // Your Qualys API server (India QG1)
-                    credsId: 'qualys-api-creds',                            // Jenkins credentials ID
-                    platform: 'India',                                      // Add this: Platform/Region (try 'India', 'QG1', or 'APAC'; confirm via global config)
-                    hostIp: '192.168.0.151',                                // Target host IP (ensure reachable by Qualys)
-                    useHost: true,                                          // Enable host scanning
-                    scanName: 'Jenkins VM Scan',                            // Custom scan name
-                    optionProfile: 'Full Scan',                             // Scan profile (verify in Qualys > Scans > Scan Options)
-                    failBySev: true,                                        // Fail on severity threshold
-                    bySev: 4,                                               // 4 = High severity
-                    pollingInterval: '2',                                   // Poll every 2 minutes (default)
-                    vulnsTimeout: '120'                                     // 120-minute timeout (default)
-                )
+                script {
+                    echo 'Running Qualys Host Scan for vulnerabilities on 192.168.0.151...'
+                    qualysVMScan(
+                        credentialsId: 'qualys-vm-creds',
+                        portalUrl: 'https://qualysguard.qg1.apps.qualys.in',  // Your India portal
+                        targetHosts: '192.168.0.151',  // Your IP
+                        scanType: 'Full Scan',  // Matches your manual test
+                        failOnCritical: true,  // Fail on critical vulns
+                        pollFrequency: 1,  // Poll every 1 min
+                        timeout: 10  // 10 min max
+                    )
+                    echo "✅ Qualys scan complete. Vulns summary in console."
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'qualys-report.*', allowEmptyArchive: true
+                }
             }
         }
 
