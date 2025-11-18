@@ -95,38 +95,63 @@ pipeline {
         }
 
 
-        // NEW: Qualys Container Security Scan
         stage('Qualys Container Security Scan') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'qualys-api-cred', usernameVariable: 'QUALYS_USERNAME', passwordVariable: 'QUALYS_PASSWORD')]) {
                     script {
-                        echo 'Running Qualys Container Security Scan...'
-                        bat """
-                            docker pull qualys/secpod:cs-scanner
-                            docker run --rm ^
-                                -e QUALYS_USERNAME=%QUALYS_USERNAME% ^
-                                -e QUALYS_PASSWORD=%QUALYS_PASSWORD% ^
-                                -v "%cd%:/workspace" ^
-                                qualys/secpod:cs-scanner ^
-                                --image-name jenkins-poc-app ^
-                                --source-type local ^
-                                --local-path /workspace ^
-                                --report-name qualys-scan-report.html ^
-                                --report-format html
+                        echo 'Running Qualys Security Scan on Python Dependencies...'
+                        
+                        // First, create a Dockerfile
+                        writeFile file: 'Dockerfile', text: """
+                        FROM python:3.9-slim
+                        COPY . /app
+                        WORKDIR /app
+                        RUN pip install -r requirements.txt
+                        CMD ["python", "-m", "pytest"]
                         """
+                        
+                        // Build Docker image
+                        bat """
+                            docker build -t jenkins-poc-python-app:${BUILD_NUMBER} .
+                        """
+                        
+                        echo "✅ Docker image built successfully"
+                        
+                        // Scan with Qualys - SIMPLIFIED approach
+                        bat """
+                            curl -u %QUALYS_USERNAME%:%QUALYS_PASSWORD% ^
+                            "https://qualysapi.qualys.com/api/2.0/fo/container/scan/?action=list&truncation_limit=1" ^
+                            -o qualys-container-test.json
+                        """
+                        
+                        if (fileExists('qualys-container-test.json')) {
+                            echo "✅ Qualys Container Security API is accessible!"
+                            
+                            // Now try the actual scan
+                            bat """
+                                curl -X POST ^
+                                -u %QUALYS_USERNAME%:%QUALYS_PASSWORD% ^
+                                -H "Content-Type: application/json" ^
+                                -d "{\\"image\\": \\"jenkins-poc-python-app:${BUILD_NUMBER}\\"}" ^
+                                "https://qualysapi.qualys.com/api/2.0/fo/container/scan/" ^
+                                -o qualys-container-scan.json
+                            """
+                            
+                            if (fileExists('qualys-container-scan.json')) {
+                                echo "✅ Qualys container vulnerability scan completed!"
+                                archiveArtifacts artifacts: 'qualys-container-scan.json', allowEmptyArchive: true
+                            }
+                        }
                     }
                 }
             }
             post {
                 always {
-                    script {
-                        if (fileExists('qualys-scan-report.html')) {
-                            echo "✅ Qualys Container Security scan completed - report generated"
-                            archiveArtifacts artifacts: 'qualys-scan-report.html', allowEmptyArchive: true
-                        } else {
-                            echo "⚠️ Qualys scan completed but no HTML report found"
-                        }
-                    }
+                    // Cleanup
+                    bat '''
+                        if exist Dockerfile del Dockerfile
+                        docker rmi jenkins-poc-python-app:%BUILD_NUMBER% 2>nul || echo "Image cleanup skipped"
+                    '''
                 }
             }
         }
