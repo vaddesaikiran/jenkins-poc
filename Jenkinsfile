@@ -76,7 +76,7 @@ pipeline {
             steps {
                 qualysVmScan(
                 credentialsId: 'qualys-api-creds',        // Change to your Jenkins credentials ID
-                apiUrl: 'https://qualysapi.qualys.in',    // Use correct regional URL
+                apiUrl: 'https://qualysguard.qg1.apps.qualys.in/',    // Use correct regional URL
                 ipv4List: '192.168.0.151',                      // Target IP(s) to scan, replace with your host IP
                 scanOptionProfile: 'Full Scan',            // Scan profile name in Qualys
                 failOnSeverity: 'High'                      // Fail build if vulnerabilities >= High severity
