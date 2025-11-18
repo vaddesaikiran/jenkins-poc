@@ -94,8 +94,6 @@ pipeline {
             }
         }
 
-        i will add only this part is this fine
-
 
         // NEW: Qualys Container Security Scan
         stage('Qualys Container Security Scan') {
