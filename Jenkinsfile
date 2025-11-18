@@ -19,6 +19,28 @@ pipeline {
             }
         }
 
+
+        stage('Set Build Info') {
+            steps {
+                script {
+                    // Get short commit hash for display name
+                    def commitHash = env.GIT_COMMIT?.take(7) ?: 'unknown'
+                    currentBuild.displayName = "#${BUILD_NUMBER} (Commit: ${commitHash})"
+                    
+                    // Get the full commit message
+                    def commitMsg = bat(script: 'git log -1 --pretty=%%B', returnStdout: true).trim()
+                    if (commitMsg) {
+                        currentBuild.description = "Commit Message: ${commitMsg}"
+                    } else {
+                        currentBuild.description = "No commit message available."
+                    }
+                    
+                    echo "Build display name set to: ${currentBuild.displayName}"
+                    echo "Build description set to: ${currentBuild.description}"
+                }
+            }
+        }
+
         stage('Clean Old Reports') {
             steps {
                 script {
@@ -68,30 +90,6 @@ pipeline {
                     } else {
                         echo "✅ Snyk scan passed. No vulnerabilities found."
                     }
-                }
-            }
-        }
-
-
-        stage('Qualys Host Scanning') {
-            steps {
-                script {
-                    echo 'Running Qualys Host Scan for vulnerabilities on 192.168.0.151...'
-                    qualysVMScan(
-                        credentialsId: 'qualys-vm-creds',
-                        portalUrl: 'https://qualysguard.qg1.apps.qualys.in',  // Your India portal
-                        targetHosts: '192.168.0.151',  // Your IP
-                        scanType: 'Full Scan',  // Matches your manual test
-                        failOnCritical: true,  // Fail on critical vulns
-                        pollFrequency: 1,  // Poll every 1 min
-                        timeout: 10  // 10 min max
-                    )
-                    echo "✅ Qualys scan complete. Vulns summary in console."
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'qualys-report.*', allowEmptyArchive: true
                 }
             }
         }
