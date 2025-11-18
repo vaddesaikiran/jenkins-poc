@@ -75,14 +75,17 @@ pipeline {
         stage('Qualys VM Scan') {
             steps {
                 qualysVulnerabilityAnalyzer(
-                    apiServer: 'https://qualysguard.qg1.apps.qualys.in/',  // Your regional Qualys API server URL
-                    credsId: 'qualys-api-creds',                            // Jenkins credentials ID (username/password)
-                    hostIp: '192.168.0.151',                                // Target host IP to scan (replace with actual)
-                    useHost: true,                                          // Enable host IP scanning
-                    optionProfile: 'Full Scan',                             // Scan profile name from your Qualys VMDR
-                    scanName: 'Jenkins VM Scan',                            // Optional: Custom scan name
-                    failBySev: true,                                        // Fail build on vulnerabilities
-                    bySev: 4                                                // Severity threshold: 4 = High (1-2=Low, 3=Medium, 4=High, 5=Critical)
+                    apiServer: 'https://qualysguard.qg1.apps.qualys.in/',  // Your Qualys API server (India QG1)
+                    credsId: 'qualys-api-creds',                            // Jenkins credentials ID
+                    platform: 'India',                                      // Add this: Platform/Region (try 'India', 'QG1', or 'APAC'; confirm via global config)
+                    hostIp: '192.168.0.151',                                // Target host IP (ensure reachable by Qualys)
+                    useHost: true,                                          // Enable host scanning
+                    scanName: 'Jenkins VM Scan',                            // Custom scan name
+                    optionProfile: 'Full Scan',                             // Scan profile (verify in Qualys > Scans > Scan Options)
+                    failBySev: true,                                        // Fail on severity threshold
+                    bySev: 4,                                               // 4 = High severity
+                    pollingInterval: '2',                                   // Poll every 2 minutes (default)
+                    vulnsTimeout: '120'                                     // 120-minute timeout (default)
                 )
             }
         }
