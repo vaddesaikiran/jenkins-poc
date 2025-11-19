@@ -58,28 +58,9 @@ pipeline {
             }
         }
 
-        stage('Secret Scan with GitLeaks') {
-            steps {
-                script {
-                    echo 'Running GitLeaks scan for secrets...'
-                    bat '''
-                        docker pull zricethezav/gitleaks:latest
-                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
-                            --source=/repo \
-                            --no-git \
-                            --exit-code 1 \
-                            --verbose
-                    '''
-                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
-                        error "❌ GitLeaks detected secrets. Failing the build."
-                    } else {
-                        echo "✅ GitLeaks scan passed. No secrets found."
-                    }
-                }
-            }
-        }
 
-        // NEW STAGE: Auto-detect Host IP (add this right after 'Snyk Scan' and before Qualys)
+
+              // NEW STAGE: Auto-detect Host IP (add this right after 'Snyk Scan' and before Qualys)
         stage('Get Host IP') {
             steps {
                 script {
@@ -127,6 +108,26 @@ pipeline {
             }
         }
 
+        stage('Secret Scan with GitLeaks') {
+            steps {
+                script {
+                    echo 'Running GitLeaks scan for secrets...'
+                    bat '''
+                        docker pull zricethezav/gitleaks:latest
+                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
+                            --source=/repo \
+                            --no-git \
+                            --exit-code 1 \
+                            --verbose
+                    '''
+                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
+                        error "❌ GitLeaks detected secrets. Failing the build."
+                    } else {
+                        echo "✅ GitLeaks scan passed. No secrets found."
+                    }
+                }
+            }
+        }
 
 
         stage('Snyk Scan') {
