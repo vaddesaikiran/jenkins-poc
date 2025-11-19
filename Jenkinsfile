@@ -59,51 +59,60 @@ pipeline {
         }
 
 
-
-              // NEW STAGE: Auto-detect Host IP (add this right after 'Snyk Scan' and before Qualys)
+        // STAGE 1: Auto-detect Host IP (unchanged mostly; added fallback error handling)
         stage('Get Host IP') {
             steps {
                 script {
                     echo 'Detecting public host IP for Qualys scan...'
-                    // For public IP (assumes curl is installed; if not, install via Chocolatey: choco install curl)
+                    // For public IP (assumes curl is installed)
                     def publicIpOutput = bat(script: 'curl -s ifconfig.me', returnStdout: true).trim()
-                    if (publicIpOutput && publicIpOutput =~ /\d+\.\d+\.\d+\.\d+/) {
+                    if (publicIpOutput && publicIpOutput =~ /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/) {
                         env.HOST_IP = publicIpOutput
                     } else {
-                        // Fallback: Prompt manual or use private (uncomment if needed)
-                        // env.HOST_IP = 'YOUR_PUBLIC_IP_HERE'  // e.g., '203.0.113.42' - get from whatismyipaddress.com
-                        error "❌ Failed to detect public IP. Please set env.HOST_IP manually or install curl."
+                        // Fallback: Hardcode your IP if curl fails (remove after testing)
+                        env.HOST_IP = '115.98.166.252'  // Your detected IP—update if it changes
+                        echo "WARNING: Curl failed; using hardcoded IP: ${env.HOST_IP}"
                     }
                     echo "Detected Public Host IP: ${env.HOST_IP}"
                 }
             }
+            post {
+                failure {
+                    error "❌ Failed to detect host IP. Install curl or hardcode it."
+                }
+            }
         }
 
-        // NEW STAGE: Qualys Host Vulnerability Scan (add right after 'Get Host IP')
+        // STAGE 2: Qualys Host Vulnerability Scan (corrected params per plugin docs)
         stage('Qualys Vulnerability Scan') {
             steps {
                 script {
                     echo 'Running Qualys VMDR host scan for vulnerabilities...'
+                    // Debug: Confirm IP before scan
+                    echo "Using Host IP for scan: ${env.HOST_IP}"
+                    
                     qualysVulnerabilityAnalyzer(
-                        credsId: 'qualys-api-cred',          // Your Jenkins cred ID (from Manage Credentials)
-                        platform: 'QUALYS_PublicCloud',      // Confirmed for your qualys.in URL (public cloud)
-                        hostIp: "${env.HOST_IP}",            // Uses dynamic public IP from previous stage
-                        network: 'Default_Network',          // Or your custom Qualys network name
-                        optionProfile: 'Initial_Options',    // Quick/basic scan profile (check Qualys portal)
-                        scannerName: 'External_scanner',     // Default for public cloud
-                        scanName: "POC-Scan-${BUILD_NUMBER}", // Unique name with build number
-                        pollingInterval: '2',                // Poll every 2 minutes for status
-                        vulnsTimeout: '30',                  // Max wait 30 minutes (increase if needed)
-                        // Failure conditions: Fail build on High+ severity vulns
-                        failBySev: true,
-                        bySev: 4,                            // 4=High/Critical (tune to 5 for Critical only)
-                        // Optional: Exclude false positives (add QIDs after first run)
-                        doExclude: false,                    // Set true and add excludeList if needed
-                        // excludeBy: 'qids',
-                        // excludeList: '10001,10002',       // Comma-separated QIDs (e.g., from Qualys reports)
-                        evaluatePotentialVulns: true         // Include potential/unconfirmed vulns for stricter check
+                        qualysCredentialsId: 'qualys-api-cred',     // Exact cred ID from Jenkins
+                        apiServerUrl: 'https://qualysapi.qg1.apps.qualys.in',  // Your India region API URL
+                        scanName: "POC-Scan-${BUILD_NUMBER}",      // Unique name
+                        targetType: 'Host IP',                     // CRITICAL: Tells plugin it's a host scan
+                        hostIp: "${env.HOST_IP}",                  // Dynamic public IP
+                        optionProfile: 'Initial Options',          // Quick profile (match your Qualys portal name)
+                        scannerName: 'External Scanner',           // Default for public cloud
+                        // Failure: Fail on High+ severity (1=All, 2=Medium+, 3=High+, 4=Critical+—start with 4)
+                        failBySeverity: 4,                         // Tune to 5 for Critical only
+                        applyToPotential: true,                    // Include potential vulns
+                        // Optional: Exclude false positives (add after first successful scan)
+                        // excludeQids: '10001,10002',              // Comma-separated QIDs
+                        pollingFrequencyMinutes: 2,                // Poll every 2 mins
+                        timeoutMinutes: 30                         // Max 30 mins wait
                     )
                     echo "✅ Qualys scan completed and passed quality criteria. No critical vulnerabilities found."
+                }
+            }
+            post {
+                failure {
+                    echo "❌ Qualys scan failed—check console for details (e.g., unreachable host, API errors)."
                 }
             }
         }
