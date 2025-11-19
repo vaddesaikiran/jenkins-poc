@@ -9,6 +9,8 @@ pipeline {
         SONARQUBE_URL = 'http://localhost:9000'
         SONARQUBE_TOKEN = credentials('sonarqube-token')
         SNYK_TOKEN = credentials('snyk-token')
+        // NEW: Qualys API credentials
+        QUALYS_CREDENTIALS = credentials('qualys-api-cred')
 
     }
 
