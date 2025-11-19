@@ -77,6 +77,56 @@ pipeline {
             }
         }
 
+        // NEW STAGE: Auto-detect Host IP (add this right after 'Snyk Scan' and before Qualys)
+        stage('Get Host IP') {
+            steps {
+                script {
+                    echo 'Detecting public host IP for Qualys scan...'
+                    // For public IP (assumes curl is installed; if not, install via Chocolatey: choco install curl)
+                    def publicIpOutput = bat(script: 'curl -s ifconfig.me', returnStdout: true).trim()
+                    if (publicIpOutput && publicIpOutput =~ /\d+\.\d+\.\d+\.\d+/) {
+                        env.HOST_IP = publicIpOutput
+                    } else {
+                        // Fallback: Prompt manual or use private (uncomment if needed)
+                        // env.HOST_IP = 'YOUR_PUBLIC_IP_HERE'  // e.g., '203.0.113.42' - get from whatismyipaddress.com
+                        error "❌ Failed to detect public IP. Please set env.HOST_IP manually or install curl."
+                    }
+                    echo "Detected Public Host IP: ${env.HOST_IP}"
+                }
+            }
+        }
+
+        // NEW STAGE: Qualys Host Vulnerability Scan (add right after 'Get Host IP')
+        stage('Qualys Vulnerability Scan') {
+            steps {
+                script {
+                    echo 'Running Qualys VMDR host scan for vulnerabilities...'
+                    qualysVulnerabilityAnalyzer(
+                        credsId: 'qualys-api-cred',          // Your Jenkins cred ID (from Manage Credentials)
+                        platform: 'QUALYS_PublicCloud',      // Confirmed for your qualys.in URL (public cloud)
+                        hostIp: "${env.HOST_IP}",            // Uses dynamic public IP from previous stage
+                        network: 'Default_Network',          // Or your custom Qualys network name
+                        optionProfile: 'Initial_Options',    // Quick/basic scan profile (check Qualys portal)
+                        scannerName: 'External_scanner',     // Default for public cloud
+                        scanName: "POC-Scan-${BUILD_NUMBER}", // Unique name with build number
+                        pollingInterval: '2',                // Poll every 2 minutes for status
+                        vulnsTimeout: '30',                  // Max wait 30 minutes (increase if needed)
+                        // Failure conditions: Fail build on High+ severity vulns
+                        failBySev: true,
+                        bySev: 4,                            // 4=High/Critical (tune to 5 for Critical only)
+                        // Optional: Exclude false positives (add QIDs after first run)
+                        doExclude: false,                    // Set true and add excludeList if needed
+                        // excludeBy: 'qids',
+                        // excludeList: '10001,10002',       // Comma-separated QIDs (e.g., from Qualys reports)
+                        evaluatePotentialVulns: true         // Include potential/unconfirmed vulns for stricter check
+                    )
+                    echo "✅ Qualys scan completed and passed quality criteria. No critical vulnerabilities found."
+                }
+            }
+        }
+
+
+
         stage('Snyk Scan') {
             steps {
                 script {
