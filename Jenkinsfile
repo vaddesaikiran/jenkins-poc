@@ -13,9 +13,9 @@ pipeline {
         QUALYS_CREDENTIALS = credentials('qualys-api-cred')
         GOOGLE_CREDENTIALS = credentials('gcp-service-account')
         // NEW: GCP Function details (customize as needed)
-        GCP_PROJECT_ID = 'gcppoc-477305'  // Replace with your actual GCP project ID
-        GCP_REGION = 'asia-south1'              // e.g., us-central1, europe-west1
-        GCP_FUNCTION_NAME = 'jenkins-poc-function'  // Name of the Cloud Function
+        GCP_PROJECT_ID = 'gcppoc-477305'
+        GCP_REGION = 'asia-south1'
+        GCP_FUNCTION_NAME = 'jenkins-poc-function'
         GCP_ENTRY_POINT = 'multiply_http'
     }
 
