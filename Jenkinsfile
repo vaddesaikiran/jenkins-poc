@@ -313,9 +313,10 @@ pipeline {
                 }
                 always {
                     // Cleanup: Deactivate service account (optional)
-                    bat '
+                    bat '''
                     set PATH=%%PATH%%;C:\\Users\\saiki\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin
-                    gcloud auth revoke --quiet 2>nul || echo "Cleanup skipped"'
+                    gcloud auth revoke --quiet 2>nul || echo "Cleanup skipped"
+                    '''
                 }
             }
 
