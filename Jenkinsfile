@@ -276,6 +276,7 @@ pipeline {
                         
                         // Ensure gcloud CLI is available (assume installed on Jenkins agent; if not, add installation step)
                         bat """
+                            set PATH=%%PATH%%;C:\\Users\\saiki\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin
                             gcloud auth activate-service-account --key-file=%GOOGLE_APPLICATION_CREDENTIALS% --project=%GCP_PROJECT_ID%
                             gcloud auth configure-docker --quiet
                         """
@@ -284,6 +285,7 @@ pipeline {
                         // --source=. uses current directory as source; runtime matches Python 3.11
                         // Trigger: HTTP for web functions; adjust --trigger-http to --trigger-topic if pub/sub
                         bat """
+                            set PATH=%%PATH%%;C:\\Users\\saiki\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin
                             gcloud functions deploy %GCP_FUNCTION_NAME% ^
                                 --runtime=python311 ^
                                 --entry-point=%GCP_ENTRY_POINT% ^
@@ -311,7 +313,9 @@ pipeline {
                 }
                 always {
                     // Cleanup: Deactivate service account (optional)
-                    bat 'gcloud auth revoke --quiet 2>nul || echo "Cleanup skipped"'
+                    bat '
+                    set PATH=%%PATH%%;C:\\Users\\saiki\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin
+                    gcloud auth revoke --quiet 2>nul || echo "Cleanup skipped"'
                 }
             }
 
