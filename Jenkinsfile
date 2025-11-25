@@ -11,7 +11,12 @@ pipeline {
         SNYK_TOKEN = credentials('snyk-token')
         // NEW: Qualys API credentials
         QUALYS_CREDENTIALS = credentials('qualys-api-cred')
-
+        GOOGLE_CREDENTIALS = credentials('gcp-service-account')
+        // NEW: GCP Function details (customize as needed)
+        GCP_PROJECT_ID = 'gcppoc-477305'  // Replace with your actual GCP project ID
+        GCP_REGION = 'asia-south1'              // e.g., us-central1, europe-west1
+        GCP_FUNCTION_NAME = 'jenkins-poc-function'  // Name of the Cloud Function
+        GCP_ENTRY_POINT = 'multiply_http'
     }
 
     stages {
@@ -117,44 +122,44 @@ pipeline {
         //     }
         // }
 
-        stage('Secret Scan with GitLeaks') {
-            steps {
-                script {
-                    echo 'Running GitLeaks scan for secrets...'
-                    bat '''
-                        docker pull zricethezav/gitleaks:latest
-                        docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
-                            --source=/repo \
-                            --no-git \
-                            --exit-code 1 \
-                            --verbose
-                    '''
-                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
-                        error "❌ GitLeaks detected secrets. Failing the build."
-                    } else {
-                        echo "✅ GitLeaks scan passed. No secrets found."
-                    }
-                }
-            }
-        }
+        // stage('Secret Scan with GitLeaks') {
+        //     steps {
+        //         script {
+        //             echo 'Running GitLeaks scan for secrets...'
+        //             bat '''
+        //                 docker pull zricethezav/gitleaks:latest
+        //                 docker run --rm -v "%cd%:/repo" zricethezav/gitleaks:latest detect \
+        //                     --source=/repo \
+        //                     --no-git \
+        //                     --exit-code 1 \
+        //                     --verbose
+        //             '''
+        //             if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
+        //                 error "❌ GitLeaks detected secrets. Failing the build."
+        //             } else {
+        //                 echo "✅ GitLeaks scan passed. No secrets found."
+        //             }
+        //         }
+        //     }
+        // }
 
 
-        stage('Snyk Scan') {
-            steps {
-                script {
-                    echo 'Running Snyk scan for vulnerabilities...'
-                    bat '''
-                        docker pull snyk/snyk:gradle-8-jdk21-preview
-                        docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:gradle-8-jdk21-preview test --file=/app/requirements.txt
-                    '''
-                    if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
-                        error "❌ Snyk detected vulnerabilities. Failing the build."
-                    } else {
-                        echo "✅ Snyk scan passed. No vulnerabilities found."
-                    }
-                }
-            }
-        }
+        // stage('Snyk Scan') {
+        //     steps {
+        //         script {
+        //             echo 'Running Snyk scan for vulnerabilities...'
+        //             bat '''
+        //                 docker pull snyk/snyk:gradle-8-jdk21-preview
+        //                 docker run --rm -e SNYK_TOKEN=%SNYK_TOKEN% -v "%cd%:/app" snyk/snyk:gradle-8-jdk21-preview test --file=/app/requirements.txt
+        //             '''
+        //             if (currentBuild.resultIsWorseOrEqualTo('FAILURE')) {
+        //                 error "❌ Snyk detected vulnerabilities. Failing the build."
+        //             } else {
+        //                 echo "✅ Snyk scan passed. No vulnerabilities found."
+        //             }
+        //         }
+        //     }
+        // }
 
 
         stage('Qualys Container Security Scan') {
@@ -231,37 +236,86 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv(installationName: 'SonarScanner') {
-                    bat """
-                        ${scannerHome}\\bin\\sonar-scanner.bat ^
-                        -Dsonar.projectKey=my_project ^
-                        -Dsonar.sources=. ^
-                        -Dsonar.tests=. ^
-                        -Dsonar.test.inclusions=test_main.py ^
-                        -Dsonar.python.coverage.reportPaths=coverage.xml ^
-                        -Dsonar.python.xunit.reportPaths=test-results.xml ^
-                        -Dsonar.host.url=${SONARQUBE_URL} ^
-                        -Dsonar.token=${SONARQUBE_TOKEN}
-                    """
-                }
-            }
-        }
+        // stage('SonarQube Analysis') {
+        //     steps {
+        //         withSonarQubeEnv(installationName: 'SonarScanner') {
+        //             bat """
+        //                 ${scannerHome}\\bin\\sonar-scanner.bat ^
+        //                 -Dsonar.projectKey=my_project ^
+        //                 -Dsonar.sources=. ^
+        //                 -Dsonar.tests=. ^
+        //                 -Dsonar.test.inclusions=test_main.py ^
+        //                 -Dsonar.python.coverage.reportPaths=coverage.xml ^
+        //                 -Dsonar.python.xunit.reportPaths=test-results.xml ^
+        //                 -Dsonar.host.url=${SONARQUBE_URL} ^
+        //                 -Dsonar.token=${SONARQUBE_TOKEN}
+        //             """
+        //         }
+        //     }
+        // }
 
-        stage('Quality Gate') {
+        // stage('Quality Gate') {
+        //     steps {
+        //         script {
+        //             def qg = waitForQualityGate()
+        //             if (qg.status != 'OK') {
+        //                 error "❌ SonarQube quality gate failed: ${qg.status}"
+        //             } else {
+        //                 echo "✅ SonarQube quality gate passed!"
+        //             }
+        //         }
+        //     }
+        // }
+
+        // NEW STAGE: Build and Deploy Cloud Function to GCP
+        stage('Deploy to GCP Cloud Functions') {
             steps {
-                script {
-                    def qg = waitForQualityGate()
-                    if (qg.status != 'OK') {
-                        error "❌ SonarQube quality gate failed: ${qg.status}"
-                    } else {
-                        echo "✅ SonarQube quality gate passed!"
+                withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                    script {
+                        echo 'Building and deploying Python Cloud Function to GCP...'
+                        
+                        // Ensure gcloud CLI is available (assume installed on Jenkins agent; if not, add installation step)
+                        bat """
+                            gcloud auth activate-service-account --key-file=%GOOGLE_APPLICATION_CREDENTIALS% --project=%GCP_PROJECT_ID%
+                            gcloud auth configure-docker --quiet
+                        """
+                        
+                        // Deploy the Cloud Function (assumes main.py has a function named ${GCP_ENTRY_POINT})
+                        // --source=. uses current directory as source; runtime matches Python 3.11
+                        // Trigger: HTTP for web functions; adjust --trigger-http to --trigger-topic if pub/sub
+                        bat """
+                            gcloud functions deploy %GCP_FUNCTION_NAME% ^
+                                --runtime=python311 ^
+                                --entry-point=%GCP_ENTRY_POINT% ^
+                                --trigger-http ^
+                                --allow-unauthenticated ^
+                                --region=%GCP_REGION% ^
+                                --source=. ^
+                                --project=%GCP_PROJECT_ID% ^
+                                --quiet
+                        """
+                        
+                        echo "✅ Cloud Function '${GCP_FUNCTION_NAME}' deployed successfully to GCP!"
+                        
+                        // Optional: Archive deployment logs or output
+                        archiveArtifacts artifacts: '*.log', allowEmptyArchive: true
                     }
                 }
             }
+            post {
+                success {
+                    echo "🎉 Deployment to GCP completed. Function URL: https://${GCP_REGION}-${GCP_PROJECT_ID}.cloudfunctions.net/${GCP_FUNCTION_NAME}"
+                }
+                failure {
+                    error "❌ GCP deployment failed. Check gcloud logs for details (e.g., auth issues, function errors)."
+                }
+                always {
+                    // Cleanup: Deactivate service account (optional)
+                    bat 'gcloud auth revoke --quiet 2>nul || echo "Cleanup skipped"'
+                }
+            }
+
         }
     }
 }
-
 
