@@ -20,9 +20,15 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh "${PIP_PATH} install -r requirements.txt"
+                sh """
+                python3 -m venv venv
+                source venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                """
             }
         }
+
 
         stage('Deploy to GCP Cloud Functions') {
             steps {
