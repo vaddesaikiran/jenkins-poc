@@ -9,6 +9,8 @@ pipeline {
         GCP_REGION = 'asia-south1'
         GCP_FUNCTION_NAME = 'jenkins-poc-function'
         GCP_ENTRY_POINT = 'multiply_http'
+        PATH = "/usr/local/share/google-cloud-sdk/bin:${env.PATH}"
+        CLOUDSDK_PYTHON = '/usr/local/bin/python3'
     }
 
     stages {
@@ -22,42 +24,31 @@ pipeline {
             steps {
                 sh """
                 python3 -m venv venv
-                source venv/bin/activate
-                pip install --upgrade pip
-                pip install -r requirements.txt
+                ./venv/bin/pip install --upgrade pip
+                ./venv/bin/pip install -r requirements.txt
                 """
             }
         }
 
-
         stage('Deploy to GCP Cloud Functions') {
             steps {
                 withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    script {
-                        echo 'Deploying Python Cloud Function to GCP...'
+                    sh """
+                        export CLOUDSDK_PYTHON=$PYTHON_PATH
+                        export PATH=/usr/local/share/google-cloud-sdk/bin:\$PATH
 
-                        // Ensure gcloud CLI is in PATH
-                        sh """
-                            export PATH=\$PATH:/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin
-                            gcloud auth activate-service-account --key-file=\$GOOGLE_APPLICATION_CREDENTIALS --project=$GCP_PROJECT_ID
-                        """
+                        gcloud auth activate-service-account --key-file=\$GOOGLE_APPLICATION_CREDENTIALS --project=$GCP_PROJECT_ID
 
-                        // Deploy Cloud Function
-                        sh """
-                            export PATH=\$PATH:/usr/local/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/bin
-                            gcloud functions deploy $GCP_FUNCTION_NAME \\
-                                --runtime=python311 \\
-                                --entry-point=$GCP_ENTRY_POINT \\
-                                --trigger-http \\
-                                --allow-unauthenticated \\
-                                --region=$GCP_REGION \\
-                                --source=. \\
-                                --project=$GCP_PROJECT_ID \\
-                                --quiet
-                        """
-
-                        echo "✅ Cloud Function '$GCP_FUNCTION_NAME' deployed successfully to GCP!"
-                    }
+                        gcloud functions deploy $GCP_FUNCTION_NAME \\
+                            --runtime=python311 \\
+                            --entry-point=$GCP_ENTRY_POINT \\
+                            --trigger-http \\
+                            --allow-unauthenticated \\
+                            --region=$GCP_REGION \\
+                            --source=. \\
+                            --project=$GCP_PROJECT_ID \\
+                            --quiet
+                    """
                 }
             }
         }
