@@ -8,7 +8,7 @@ pipeline {
         GCP_ENTRY_POINT   = 'multiply_http'
         TARGET_SA         = 'wif-jenkins-sa@gcppoc-477305.iam.gserviceaccount.com'
         JENKINS_URL       = 'https://fransisca-unsummable-subspirally.ngrok-free.dev'
-        CRED_ID           = 'jenkins-oidc-local'   // ← your OIDC credential ID
+        CRED_ID           = 'jenkins-oidc-local'
     }
 
     stages {
@@ -20,24 +20,24 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh """
+                sh '''
                 python3 -m venv venv
                 . venv/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
-                pip install "pyjwt[crypto]"   # needed for JWT signing
-                """
+                pip install "pyjwt[crypto]"
+                '''
             }
         }
 
         stage('Prepare Deployment Package') {
             steps {
-                sh """
+                sh '''
                 DEPLOY_DIR=deploy_temp
-                rm -rf \$DEPLOY_DIR
-                mkdir \$DEPLOY_DIR
-                cp main.py requirements.txt \$DEPLOY_DIR/
-                """
+                rm -rf $DEPLOY_DIR
+                mkdir $DEPLOY_DIR
+                cp main.py requirements.txt $DEPLOY_DIR/
+                '''
             }
         }
 
@@ -46,12 +46,15 @@ pipeline {
                 sh '''
                 set -e
 
+                # ← THIS LINE WAS MISSING BEFORE ←
+                . venv/bin/activate
+
                 # Generate persistent RSA key (only once)
                 [ -f private_key.pem ] || openssl genrsa -out private_key.pem 2048
 
-                # Create and sign the JWT (this also populates the public JWKS endpoint)
-                JWT=$(python3 - <<PY
-import jwt, time
+                # Sign JWT — this populates the public JWKS endpoint
+                JWT=$(python3 - <<'PY'
+import jwt, time, os
 payload = {
   "iss": "${JENKINS_URL}/oidc/credential/${CRED_ID}",
   "aud": "https://iam.googleapis.com/",
@@ -63,16 +66,15 @@ print(jwt.encode(payload, open("private_key.pem").read(), algorithm="RS256", hea
 PY
                 )
 
-                # Exchange JWT → short-lived GCP access token
+                # Exchange for GCP token
                 TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
                   -d '{"jwt":"'"$JWT"'"}' \
                   "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${TARGET_SA}:generateAccessToken" \
                   | jq -r .accessToken)
 
-                # Use the token for gcloud
+                # Deploy using the token
                 gcloud config set auth/access_token "$TOKEN" --quiet
 
-                # Deploy exactly like you did before
                 gcloud functions deploy ${GCP_FUNCTION_NAME} \
                     --runtime=python311 \
                     --entry-point=${GCP_ENTRY_POINT} \
