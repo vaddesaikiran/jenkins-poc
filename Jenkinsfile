@@ -2,15 +2,13 @@ pipeline {
     agent any
 
     environment {
-        PYTHON_PATH = '/usr/local/bin/python3'
-        PIP_PATH = '/usr/local/bin/pip3'
-        GOOGLE_CREDENTIALS = credentials('gcp-service-account')
-        GCP_PROJECT_ID = 'gcppoc-477305'
-        GCP_REGION = 'asia-south1'
+        GCP_PROJECT_ID    = 'gcppoc-477305'
+        GCP_REGION        = 'asia-south1'
         GCP_FUNCTION_NAME = 'jenkins-poc-function-two'
-        GCP_ENTRY_POINT = 'multiply_http'
-        PATH = "/usr/local/share/google-cloud-sdk/bin:${env.PATH}"
-        CLOUDSDK_PYTHON = '/usr/local/bin/python3'
+        GCP_ENTRY_POINT   = 'multiply_http'
+        TARGET_SA         = 'wif-jenkins-sa@gcppoc-477305.iam.gserviceaccount.com'
+        JENKINS_URL       = 'https://fransisca-unsummable-subspirally.ngrok-free.dev'
+        CRED_ID           = 'jenkins-oidc-local'   // ← your OIDC credential ID
     }
 
     stages {
@@ -24,8 +22,10 @@ pipeline {
             steps {
                 sh """
                 python3 -m venv venv
-                ./venv/bin/pip install --upgrade pip
-                ./venv/bin/pip install -r requirements.txt
+                . venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                pip install "pyjwt[crypto]"   # needed for JWT signing
                 """
             }
         }
@@ -33,40 +33,67 @@ pipeline {
         stage('Prepare Deployment Package') {
             steps {
                 sh """
-                # Create a temporary directory for deployment
                 DEPLOY_DIR=deploy_temp
                 rm -rf \$DEPLOY_DIR
                 mkdir \$DEPLOY_DIR
-
-                # Copy only main.py and requirements.txt
                 cp main.py requirements.txt \$DEPLOY_DIR/
                 """
             }
         }
 
-        stage('Deploy to GCP Cloud Functions') {
+        stage('Keyless Deploy to GCP Cloud Functions') {
             steps {
-                withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    sh """
-                        export CLOUDSDK_PYTHON=$PYTHON_PATH
-                        export PATH=/usr/local/share/google-cloud-sdk/bin:\$PATH
+                sh '''
+                set -e
 
-                        # Authenticate with service account
-                        gcloud auth activate-service-account --key-file=\$GOOGLE_APPLICATION_CREDENTIALS --project=$GCP_PROJECT_ID
+                # Generate persistent RSA key (only once)
+                [ -f private_key.pem ] || openssl genrsa -out private_key.pem 2048
 
-                        # Deploy only the files inside the temporary directory
-                        gcloud functions deploy $GCP_FUNCTION_NAME \\
-                            --runtime=python311 \\
-                            --entry-point=$GCP_ENTRY_POINT \\
-                            --trigger-http \\
-                            --allow-unauthenticated \\
-                            --region=$GCP_REGION \\
-                            --source=deploy_temp \\
-                            --project=$GCP_PROJECT_ID \\
-                            --quiet
-                    """
-                }
+                # Create and sign the JWT (this also populates the public JWKS endpoint)
+                JWT=$(python3 - <<PY
+import jwt, time
+payload = {
+  "iss": "${JENKINS_URL}/oidc/credential/${CRED_ID}",
+  "aud": "https://iam.googleapis.com/",
+  "sub": "${JENKINS_URL}/job/${JOB_NAME}/${BUILD_NUMBER}",
+  "iat": int(time.time()),
+  "exp": int(time.time()) + 1800
+}
+print(jwt.encode(payload, open("private_key.pem").read(), algorithm="RS256", headers={"kid": "${CRED_ID}"}))
+PY
+                )
+
+                # Exchange JWT → short-lived GCP access token
+                TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
+                  -d '{"jwt":"'"$JWT"'"}' \
+                  "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${TARGET_SA}:generateAccessToken" \
+                  | jq -r .accessToken)
+
+                # Use the token for gcloud
+                gcloud config set auth/access_token "$TOKEN" --quiet
+
+                # Deploy exactly like you did before
+                gcloud functions deploy ${GCP_FUNCTION_NAME} \
+                    --runtime=python311 \
+                    --entry-point=${GCP_ENTRY_POINT} \
+                    --trigger-http \
+                    --allow-unauthenticated \
+                    --region=${GCP_REGION} \
+                    --source=deploy_temp \
+                    --project=${GCP_PROJECT_ID} \
+                    --service-account=${TARGET_SA} \
+                    --quiet
+
+                echo "KEYLESS DEPLOYMENT SUCCESSFUL!"
+                echo "Function URL: https://${GCP_REGION}-${GCP_PROJECT_ID}.cloudfunctions.net/${GCP_FUNCTION_NAME}"
+                '''
             }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
         }
     }
 }
